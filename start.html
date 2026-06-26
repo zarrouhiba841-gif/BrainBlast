@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BrainBlast — Gamified Quiz</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0d0f1a;
+    --surface: #151829;
+    --surface2: #1e2235;
+    --border: #2a2f4a;
+    --accent: #7c6fff;
+    --accent2: #ff6b9d;
+    --gold: #ffd166;
+    --green: #06d6a0;
+    --red: #ef476f;
+    --text: #e8eaf6;
+    --muted: #8b90b0;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── PARTICLES ── */
+  #particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0;
+    animation: float linear infinite;
+  }
+  @keyframes float {
+    0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+    10%  { opacity: .5; }
+    90%  { opacity: .3; }
+    100% { transform: translateY(-20px) scale(1); opacity: 0; }
+  }
+
+  /* ── LAYOUT ── */
+  #app { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 20px;
+  }
+  .logo { font-family: 'Space Mono', monospace; font-size: 1.3rem; font-weight: 700; color: var(--accent); letter-spacing: -1px; }
+  .logo span { color: var(--accent2); }
+  .header-stats { display: flex; gap: 20px; }
+  .hstat { display: flex; flex-direction: column; align-items: center; }
+  .hstat-val { font-family: 'Space Mono', monospace; font-size: 1.1rem; font-weight: 700; color: var(--gold); }
+  .hstat-lbl { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  /* ── XP BAR ── */
+  .xp-bar-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 20px; margin-bottom: 20px; }
+  .xp-bar-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .level-badge {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 20px; padding: 3px 14px;
+    font-family: 'Space Mono', monospace; font-size: .8rem; font-weight: 700;
+  }
+  .xp-label { font-size: .8rem; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .xp-track { background: var(--surface2); border-radius: 99px; height: 10px; overflow: hidden; }
+  .xp-fill {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width .6s cubic-bezier(.4,0,.2,1);
+    position: relative;
+  }
+  .xp-fill::after {
+    content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px;
+    background: white; border-radius: 99px; opacity: .8;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:.8} 50%{opacity:.2} }
+
+  /* ── STREAK ── */
+  .streak-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 20px; margin-bottom: 20px;
+  }
+  .streak-fire { font-size: 1.4rem; }
+  .streak-text { font-size: .9rem; }
+  .streak-count { font-family: 'Space Mono', monospace; font-size: 1.3rem; font-weight: 700; color: #ff9f40; margin-left: auto; }
+  .streak-dots { display: flex; gap: 5px; }
+  .streak-dot {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid var(--border); background: var(--surface2);
+    display: flex; align-items: center; justify-content: center; font-size: .7rem;
+    transition: all .3s;
+  }
+  .streak-dot.lit { background: #ff9f40; border-color: #ff9f40; animation: dotPop .3s ease; }
+  @keyframes dotPop { 0%{transform:scale(1)} 50%{transform:scale(1.4)} 100%{transform:scale(1)} }
+
+  /* ── SCREENS ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── HOME ── */
+  .home-hero {
+    text-align: center; padding: 40px 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 20px;
+  }
+  .home-hero h1 { font-size: 2.4rem; font-weight: 700; margin-bottom: 8px; }
+  .home-hero h1 em { font-style: normal; color: var(--accent); }
+  .home-hero p { color: var(--muted); max-width: 400px; margin: 0 auto 28px; line-height: 1.6; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white; border: none; border-radius: 99px;
+    padding: 14px 32px; font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 4px 20px rgba(124,111,255,.4);
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,111,255,.5); }
+  .btn:active { transform: translateY(0); }
+  .btn-ghost {
+    background: transparent; border: 2px solid var(--border);
+    box-shadow: none; color: var(--text); padding: 10px 22px; font-size: .9rem;
+  }
+  .btn-ghost:hover { border-color: var(--accent); box-shadow: none; }
+
+  .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .cat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 16px;
+    cursor: pointer; transition: all .2s; text-align: center;
+  }
+  .cat-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(124,111,255,.2); }
+  .cat-card.selected { border-color: var(--accent); background: rgba(124,111,255,.1); }
+  .cat-icon { font-size: 2rem; margin-bottom: 8px; }
+  .cat-name { font-weight: 600; font-size: .95rem; }
+  .cat-count { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── QUIZ ── */
+  .quiz-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .q-counter { font-family: 'Space Mono', monospace; font-size: .9rem; color: var(--muted); }
+  .timer-ring { position: relative; width: 54px; height: 54px; }
+  .timer-ring svg { transform: rotate(-90deg); }
+  .timer-ring circle { fill: none; stroke-width: 4; }
+  .timer-bg { stroke: var(--surface2); }
+  .timer-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .5s; }
+  .timer-val {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700;
+  }
+  .progress-track { background: var(--surface2); border-radius: 99px; height: 6px; margin-bottom: 24px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width .4s; }
+
+  .question-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px; margin-bottom: 16px;
+  }
+  .q-difficulty { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; margin-bottom: 14px; }
+  .q-difficulty.easy { background: rgba(6,214,160,.15); color: var(--green); }
+  .q-difficulty.medium { background: rgba(255,209,102,.15); color: var(--gold); }
+  .q-difficulty.hard { background: rgba(239,71,111,.15); color: var(--red); }
+  .q-text { font-size: 1.15rem; font-weight: 500; line-height: 1.6; }
+
+  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  @media(max-width:560px){ .options-grid { grid-template-columns: 1fr; } }
+  .option-btn {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px;
+    text-align: left; cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    font-size: .95rem; color: var(--text); transition: all .15s;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .option-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(124,111,255,.1); }
+  .option-btn .opt-letter {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--surface2); display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace; font-size: .8rem; font-weight: 700; flex-shrink: 0;
+  }
+  .option-btn.correct { border-color: var(--green); background: rgba(6,214,160,.12); }
+  .option-btn.correct .opt-letter { background: var(--green); color: #000; }
+  .option-btn.wrong { border-color: var(--red); background: rgba(239,71,111,.12); }
+  .option-btn.wrong .opt-letter { background: var(--red); color: white; }
+  .option-btn:disabled { cursor: default; }
+
+  .feedback-bar {
+    border-radius: var(--radius); padding: 14px 20px;
+    margin-bottom: 16px; font-weight: 600; display: none;
+    align-items: center; gap: 10px;
+  }
+  .feedback-bar.show { display: flex; }
+  .feedback-bar.correct-fb { background: rgba(6,214,160,.12); border: 1px solid var(--green); color: var(--green); }
+  .feedback-bar.wrong-fb { background: rgba(239,71,111,.12); border: 1px solid var(--red); color: var(--red); }
+  .xp-gained { margin-left: auto; font-family: 'Space Mono', monospace; font-size: .85rem; background: rgba(124,111,255,.2); padding: 3px 10px; border-radius: 99px; color: var(--accent); }
+
+  /* ── BADGES ── */
+  .badges-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  .badges-title { font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .badges-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .badge {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    width: 72px; opacity: .3; filter: grayscale(1); transition: all .4s;
+  }
+  .badge.earned { opacity: 1; filter: none; }
+  .badge-icon { font-size: 2rem; background: var(--surface2); border-radius: 12px; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--border); }
+  .badge.earned .badge-icon { border-color: var(--gold); box-shadow: 0 0 14px rgba(255,209,102,.3); animation: badgePop .4s ease; }
+  @keyframes badgePop { 0%{transform:scale(1)} 40%{transform:scale(1.3) rotate(-5deg)} 70%{transform:scale(.9)} 100%{transform:scale(1)} }
+  .badge-name { font-size: .62rem; color: var(--muted); text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* ── LEADERBOARD ── */
+  .leaderboard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  .lb-title { font-weight: 700; margin-bottom: 14px; }
+  .lb-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 10px; margin-bottom: 6px;
+    transition: background .2s;
+  }
+  .lb-row:hover { background: var(--surface2); }
+  .lb-row.you { background: rgba(124,111,255,.1); border: 1px solid rgba(124,111,255,.3); }
+  .lb-rank { font-family: 'Space Mono', monospace; font-size: .8rem; font-weight: 700; width: 24px; text-align: center; color: var(--muted); }
+  .lb-rank.top1 { color: #ffd166; }
+  .lb-rank.top2 { color: #c0c0c0; }
+  .lb-rank.top3 { color: #cd7f32; }
+  .lb-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+  .lb-name { flex: 1; font-size: .9rem; font-weight: 500; }
+  .lb-score { font-family: 'Space Mono', monospace; font-size: .85rem; color: var(--gold); font-weight: 700; }
+  .lb-level { font-size: .7rem; background: rgba(124,111,255,.2); color: var(--accent); padding: 2px 8px; border-radius: 99px; }
+
+  /* ── RESULTS ── */
+  .results-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 36px; text-align: center; margin-bottom: 20px;
+  }
+  .results-emoji { font-size: 4rem; margin-bottom: 16px; }
+  .results-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+  .results-sub { color: var(--muted); margin-bottom: 28px; }
+  .results-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 28px; }
+  .rstat { background: var(--surface2); border-radius: 12px; padding: 16px 10px; }
+  .rstat-val { font-family: 'Space Mono', monospace; font-size: 1.6rem; font-weight: 700; }
+  .rstat-lbl { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .results-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  /* ── TOAST ── */
+  #toast-area { position: fixed; top: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 18px; min-width: 220px;
+    display: flex; align-items: center; gap: 10px;
+    animation: toastIn .3s ease, toastOut .3s ease 2.7s forwards;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  @keyframes toastIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+  @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateX(120%)} }
+  .toast-icon { font-size: 1.4rem; }
+  .toast-msg { font-size: .85rem; font-weight: 500; }
+
+  /* ── LEVEL UP MODAL ── */
+  #level-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.8);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  #level-modal.show { display: flex; }
+  .level-card {
+    background: var(--surface); border: 2px solid var(--accent);
+    border-radius: 20px; padding: 48px 40px; text-align: center;
+    max-width: 340px; animation: levelIn .4s cubic-bezier(.34,1.56,.64,1);
+    box-shadow: 0 0 60px rgba(124,111,255,.3);
+  }
+  @keyframes levelIn { from{transform:scale(.5);opacity:0} to{transform:scale(1);opacity:1} }
+  .level-emoji { font-size: 4rem; margin-bottom: 16px; }
+  .level-card h2 { font-size: 1.6rem; font-weight: 700; margin-bottom: 8px; color: var(--gold); }
+  .level-card p { color: var(--muted); margin-bottom: 24px; }
+
+  /* ── NAV TABS ── */
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab-btn {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px; font-family: 'Space Grotesk', sans-serif;
+    font-size: .85rem; color: var(--muted); cursor: pointer; font-weight: 600;
+    transition: all .15s;
+  }
+  .tab-btn:hover { border-color: var(--accent); color: var(--text); }
+  .tab-btn.active { background: rgba(124,111,255,.15); border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div id="particles"></div>
+<div id="toast-area"></div>
+
+<div id="level-modal">
+  <div class="level-card">
+    <div class="level-emoji">⚡</div>
+    <h2 id="level-modal-title">Level Up!</h2>
+    <p id="level-modal-sub">You've reached a new level!</p>
+    <button class="btn" onclick="closeLevelModal()">Let's Go!</button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="logo">Brain<span>Blast</span></div>
+    <div class="header-stats">
+      <div class="hstat"><div class="hstat-val" id="h-coins">0</div><div class="hstat-lbl">Coins</div></div>
+      <div class="hstat"><div class="hstat-val" id="h-total-xp">0</div><div class="hstat-lbl">Total XP</div></div>
+      <div class="hstat"><div class="hstat-val" id="h-correct">0</div><div class="hstat-lbl">Correct</div></div>
+    </div>
+  </header>
+
+  <div class="xp-bar-wrap">
+    <div class="xp-bar-top">
+      <div class="level-badge" id="level-badge">Level 1</div>
+      <div class="xp-label" id="xp-label">0 / 100 XP</div>
+    </div>
+    <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="streak-bar">
+    <div class="streak-fire">🔥</div>
+    <div class="streak-text">Current Streak</div>
+    <div class="streak-dots" id="streak-dots"></div>
+    <div class="streak-count" id="streak-count">0</div>
+  </div>
+
+  <!-- HOME SCREEN -->
+  <div id="screen-home" class="screen active">
+    <div class="home-hero">
+      <h1>Test Your <em>Knowledge</em></h1>
+      <p>Earn XP, unlock badges, and climb the leaderboard. Pick a category and start your quest.</p>
+      <button class="btn" onclick="showCategorySelect()">🚀 Start Playing</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('home-badges')">🏅 Badges</button>
+      <button class="tab-btn" onclick="switchTab('home-leaderboard')">🏆 Leaderboard</button>
+    </div>
+
+    <div id="home-badges">
+      <div class="badges-section">
+        <div class="badges-title">🏅 Your Badges</div>
+        <div class="badges-grid" id="badges-grid"></div>
+      </div>
+    </div>
+    <div id="home-leaderboard" style="display:none">
+      <div class="leaderboard">
+        <div class="lb-title">🏆 Leaderboard</div>
+        <div id="lb-rows"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORY SCREEN -->
+  <div id="screen-category" class="screen">
+    <div style="margin-bottom:16px; font-size:1.1rem; font-weight:700;">Choose a Category</div>
+    <div class="category-grid" id="cat-grid"></div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn" onclick="startQuiz()">▶ Play Selected</button>
+      <button class="btn btn-ghost" onclick="showScreen('screen-home')">← Back</button>
+    </div>
+  </div>
+
+  <!-- QUIZ SCREEN -->
+  <div id="screen-quiz" class="screen">
+    <div class="quiz-top">
+      <div class="q-counter" id="q-counter">Question 1 of 7</div>
+      <div class="timer-ring">
+        <svg width="54" height="54" viewBox="0 0 54 54">
+          <circle class="timer-bg" cx="27" cy="27" r="23" stroke-dasharray="144.5" stroke-dashoffset="0"/>
+          <circle class="timer-fg" id="timer-arc" cx="27" cy="27" r="23" stroke-dasharray="144.5" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-val" id="timer-val">15</div>
+      </div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="q-progress" style="width:0%"></div></div>
+
+    <div class="question-card">
+      <div id="q-difficulty" class="q-difficulty easy">Easy</div>
+      <div id="q-text" class="q-text">Question text</div>
+    </div>
+
+    <div class="options-grid" id="options-grid"></div>
+    <div class="feedback-bar" id="feedback-bar">
+      <span id="feedback-icon">✓</span>
+      <span id="feedback-text">Correct!</span>
+      <span class="xp-gained" id="xp-gained">+20 XP</span>
+    </div>
+    <button class="btn" id="next-btn" style="display:none" onclick="nextQuestion()">Next →</button>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="screen-results" class="screen">
+    <div class="results-card">
+      <div class="results-emoji" id="results-emoji">🎉</div>
+      <div class="results-title" id="results-title">Quiz Complete!</div>
+      <div class="results-sub" id="results-sub">Here's how you did</div>
+      <div class="results-stats">
+        <div class="rstat"><div class="rstat-val" id="r-score" style="color:var(--green)">0/7</div><div class="rstat-lbl">Score</div></div>
+        <div class="rstat"><div class="rstat-val" id="r-xp" style="color:var(--accent)">0</div><div class="rstat-lbl">XP Earned</div></div>
+        <div class="rstat"><div class="rstat-val" id="r-coins" style="color:var(--gold)">0</div><div class="rstat-lbl">Coins</div></div>
+      </div>
+      <div class="results-btns">
+        <button class="btn" onclick="startQuiz()">🔄 Play Again</button>
+        <button class="btn btn-ghost" onclick="showCategorySelect()">📚 Categories</button>
+        <button class="btn btn-ghost" onclick="showScreen('screen-home')">🏠 Home</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const QUESTIONS = {
+  science: [
+    { q: "What is the powerhouse of the cell?", opts: ["Nucleus","Mitochondria","Ribosome","Golgi Apparatus"], ans: 1, diff: "easy", xp: 20 },
+    { q: "Which planet is known as the Red Planet?", opts: ["Venus","Jupiter","Mars","Saturn"], ans: 2, diff: "easy", xp: 20 },
+    { q: "What is the chemical symbol for Gold?", opts: ["Go","Gd","Ag","Au"], ans: 3, diff: "medium", xp: 30 },
+    { q: "What is the speed of light in a vacuum (approx)?", opts: ["300,000 km/s","150,000 km/s","450,000 km/s","200,000 km/s"], ans: 0, diff: "medium", xp: 30 },
+    { q: "Which force keeps planets in orbit around the Sun?", opts: ["Electromagnetism","Gravity","Nuclear force","Friction"], ans: 1, diff: "easy", xp: 20 },
+    { q: "DNA is made of which sugar?", opts: ["Ribose","Glucose","Fructose","Deoxyribose"], ans: 3, diff: "hard", xp: 50 },
+    { q: "Which element has the highest melting point?", opts: ["Iron","Tungsten","Platinum","Carbon"], ans: 1, diff: "hard", xp: 50 },
+  ],
+  math: [
+    { q: "What is the value of π (pi) to 2 decimal places?", opts: ["3.12","3.14","3.16","3.18"], ans: 1, diff: "easy", xp: 20 },
+    { q: "What is the square root of 144?", opts: ["11","12","13","14"], ans: 1, diff: "easy", xp: 20 },
+    { q: "If x² = 49, what is x (positive value)?", opts: ["6","7","8","9"], ans: 1, diff: "medium", xp: 30 },
+    { q: "What is 15% of 200?", opts: ["25","30","35","20"], ans: 1, diff: "medium", xp: 30 },
+    { q: "How many degrees in a triangle?", opts: ["90","270","180","360"], ans: 2, diff: "easy", xp: 20 },
+    { q: "What is the derivative of x³?", opts: ["2x","3x","3x²","x²"], ans: 2, diff: "hard", xp: 50 },
+    { q: "What is log₂(64)?", opts: ["4","5","6","7"], ans: 2, diff: "hard", xp: 50 },
+  ],
+  history: [
+    { q: "In which year did World War II end?", opts: ["1943","1944","1945","1946"], ans: 2, diff: "easy", xp: 20 },
+    { q: "Who was the first President of the United States?", opts: ["John Adams","Thomas Jefferson","George Washington","Abraham Lincoln"], ans: 2, diff: "easy", xp: 20 },
+    { q: "The Great Wall of China was primarily built during which dynasty?", opts: ["Han","Tang","Ming","Qing"], ans: 2, diff: "medium", xp: 30 },
+    { q: "Which empire was ruled by Genghis Khan?", opts: ["Ottoman Empire","Roman Empire","Mongol Empire","Persian Empire"], ans: 2, diff: "medium", xp: 30 },
+    { q: "The Renaissance began in which country?", opts: ["France","England","Germany","Italy"], ans: 3, diff: "medium", xp: 30 },
+    { q: "Who wrote the 95 Theses in 1517?", opts: ["John Calvin","Martin Luther","Henry VIII","Erasmus"], ans: 1, diff: "hard", xp: 50 },
+    { q: "The Battle of Thermopylae involved which two sides?", opts: ["Rome vs Carthage","Athens vs Sparta","Greeks vs Persians","Egypt vs Greece"], ans: 2, diff: "hard", xp: 50 },
+  ],
+  geography: [
+    { q: "What is the capital of Japan?", opts: ["Beijing","Seoul","Tokyo","Bangkok"], ans: 2, diff: "easy", xp: 20 },
+    { q: "What is the longest river in the world?", opts: ["Amazon","Yangtze","Nile","Mississippi"], ans: 2, diff: "easy", xp: 20 },
+    { q: "Which country has the most natural lakes?", opts: ["Russia","USA","Brazil","Canada"], ans: 3, diff: "medium", xp: 30 },
+    { q: "What is the smallest country in the world?", opts: ["Monaco","Liechtenstein","Vatican City","San Marino"], ans: 2, diff: "medium", xp: 30 },
+    { q: "Which desert is the largest in the world?", opts: ["Gobi","Sahara","Arabian","Antarctic"], ans: 3, diff: "hard", xp: 50 },
+    { q: "Mount Everest is in which mountain range?", opts: ["Andes","Himalayas","Alps","Rockies"], ans: 1, diff: "easy", xp: 20 },
+    { q: "What is the currency of Brazil?", opts: ["Peso","Dollar","Real","Sol"], ans: 2, diff: "medium", xp: 30 },
+  ],
+};
+
+const CATEGORIES = [
+  { id: "science", name: "Science", icon: "🔬", color: "#06d6a0" },
+  { id: "math",    name: "Math",    icon: "➗", color: "#7c6fff" },
+  { id: "history", name: "History", icon: "🏛️", color: "#ffd166" },
+  { id: "geography", name: "Geography", icon: "🌍", color: "#ff6b9d" },
+];
+
+const BADGES_DEF = [
+  { id: "first_blood",   icon: "⚡", name: "First Win",  cond: s => s.totalCorrect >= 1 },
+  { id: "streak3",       icon: "🔥", name: "On Fire",    cond: s => s.maxStreak >= 3 },
+  { id: "streak5",       icon: "💥", name: "Unstoppable",cond: s => s.maxStreak >= 5 },
+  { id: "level3",        icon: "🌟", name: "Rising Star",cond: s => s.level >= 3 },
+  { id: "level5",        icon: "👑", name: "Champion",   cond: s => s.level >= 5 },
+  { id: "xp500",         icon: "💎", name: "XP Legend",  cond: s => s.totalXp >= 500 },
+  { id: "perfectquiz",   icon: "🎯", name: "Perfect",    cond: s => s.lastPerfect },
+  { id: "quiz10",        icon: "📚", name: "Scholar",    cond: s => s.quizzes >= 3 },
+];
+
+const LEADERBOARD_NPCs = [
+  { name: "Alex Chen",    avatar: "🧑", score: 1840, level: 8 },
+  { name: "Mia Tanaka",   avatar: "👩", score: 1620, level: 7 },
+  { name: "Diego R.",     avatar: "🧔", score: 1290, level: 6 },
+  { name: "Emma Liu",     avatar: "👧", score: 980,  level: 5 },
+  { name: "Sam Park",     avatar: "🙋", score: 740,  level: 4 },
+];
+
+const XP_PER_LEVEL = 100;
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let state = {
+  xp: 0, level: 1, totalXp: 0, coins: 0,
+  streak: 0, maxStreak: 0,
+  totalCorrect: 0, quizzes: 0, lastPerfect: false,
+  badges: new Set(),
+};
+let quiz = { questions: [], index: 0, correct: 0, xpEarned: 0, coinsEarned: 0, category: "science" };
+let timerInterval = null;
+let timeLeft = 15;
+
+// ── PARTICLES ─────────────────────────────────────────────────────────────────
+function spawnParticles() {
+  const container = document.getElementById('particles');
+  const colors = ['#7c6fff','#ff6b9d','#06d6a0','#ffd166'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 6 + 3;
+    p.style.cssText = `
+      width:${size}px;height:${size}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      left:${Math.random()*100}%;
+      animation-duration:${8+Math.random()*12}s;
+      animation-delay:${Math.random()*10}s;
+    `;
+    container.appendChild(p);
+  }
+}
+
+// ── UI HELPERS ─────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('home-badges').style.display = tabId === 'home-badges' ? '' : 'none';
+  document.getElementById('home-leaderboard').style.display = tabId === 'home-leaderboard' ? '' : 'none';
+}
+
+function toast(icon, msg) {
+  const area = document.getElementById('toast-area');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${msg}</span>`;
+  area.appendChild(t);
+  setTimeout(() => t.remove(), 3100);
+}
+
+function closeLevelModal() {
+  document.getElementById('level-modal').classList.remove('show');
+}
+
+// ── STATS UPDATE ───────────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('h-coins').textContent = state.coins;
+  document.getElementById('h-total-xp').textContent = state.totalXp;
+  document.getElementById('h-correct').textContent = state.totalCorrect;
+  document.getElementById('level-badge').textContent = `Level ${state.level}`;
+
+  const xpForLevel = state.level * XP_PER_LEVEL;
+  const pct = Math.min((state.xp / xpForLevel) * 100, 100);
+  document.getElementById('xp-fill').style.width = pct + '%';
+  document.getElementById('xp-label').textContent = `${state.xp} / ${xpForLevel} XP`;
+
+  // Streak dots
+  const dotsEl = document.getElementById('streak-dots');
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < 5; i++) {
+    const d = document.createElement('div');
+    d.className = 'streak-dot' + (i < state.streak ? ' lit' : '');
+    d.textContent = i < state.streak ? '🔥' : '';
+    dotsEl.appendChild(d);
+  }
+  document.getElementById('streak-count').textContent = state.streak;
+}
+
+function gainXP(amount) {
+  state.xp += amount;
+  state.totalXp += amount;
+  const xpForLevel = state.level * XP_PER_LEVEL;
+  if (state.xp >= xpForLevel) {
+    state.xp -= xpForLevel;
+    state.level++;
+    const modal = document.getElementById('level-modal');
+    document.getElementById('level-modal-title').textContent = `Level ${state.level}! 🎉`;
+    document.getElementById('level-modal-sub').textContent = `You've reached Level ${state.level}. Keep going!`;
+    modal.classList.add('show');
+    toast('⚡', `Level Up! You're now Level ${state.level}`);
+  }
+  updateHUD();
+  checkBadges();
+}
+
+function checkBadges() {
+  BADGES_DEF.forEach(b => {
+    if (!state.badges.has(b.id) && b.cond(state)) {
+      state.badges.add(b.id);
+      toast('🏅', `Badge Unlocked: ${b.name} ${b.icon}`);
+      renderBadges();
+    }
+  });
+}
+
+function renderBadges() {
+  const grid = document.getElementById('badges-grid');
+  grid.innerHTML = '';
+  BADGES_DEF.forEach(b => {
+    const el = document.createElement('div');
+    el.className = 'badge' + (state.badges.has(b.id) ? ' earned' : '');
+    el.innerHTML = `<div class="badge-icon">${b.icon}</div><div class="badge-name">${b.name}</div>`;
+    el.title = b.name;
+    grid.appendChild(el);
+  });
+}
+
+function renderLeaderboard() {
+  const lbRows = document.getElementById('lb-rows');
+  const all = [...LEADERBOARD_NPCs, { name: "You", avatar: "😎", score: state.totalXp, level: state.level, you: true }];
+  all.sort((a, b) => b.score - a.score);
+  lbRows.innerHTML = '';
+  all.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'lb-row' + (p.you ? ' you' : '');
+    const rankCls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1;
+    row.innerHTML = `
+      <div class="lb-rank ${rankCls}">${medal}</div>
+      <div class="lb-avatar">${p.avatar}</div>
+      <div class="lb-name">${p.name}${p.you ? ' <span style="font-size:.7rem;color:var(--accent)">(You)</span>' : ''}</div>
+      <div class="lb-level">Lv.${p.level}</div>
+      <div class="lb-score">${p.score} XP</div>
+    `;
+    lbRows.appendChild(row);
+  });
+}
+
+// ── CATEGORY SELECT ────────────────────────────────────────────────────────────
+function showCategorySelect() {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = '';
+  CATEGORIES.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'cat-card' + (quiz.category === c.id ? ' selected' : '');
+    card.innerHTML = `
+      <div class="cat-icon">${c.icon}</div>
+      <div class="cat-name">${c.name}</div>
+      <div class="cat-count">${QUESTIONS[c.id].length} questions</div>
+    `;
+    card.onclick = () => {
+      quiz.category = c.id;
+      document.querySelectorAll('.cat-card').forEach(el => el.classList.remove('selected'));
+      card.classList.add('selected');
+    };
+    grid.appendChild(card);
+  });
+  showScreen('screen-category');
+}
+
+// ── QUIZ ENGINE ────────────────────────────────────────────────────────────────
+function startQuiz() {
+  const qs = [...QUESTIONS[quiz.category]].sort(() => Math.random() - .5).slice(0, 7);
+  quiz.questions = qs;
+  quiz.index = 0;
+  quiz.correct = 0;
+  quiz.xpEarned = 0;
+  quiz.coinsEarned = 0;
+  state.quizzes++;
+  showScreen('screen-quiz');
+  loadQuestion();
+}
+
+function loadQuestion() {
+  const q = quiz.questions[quiz.index];
+  const total = quiz.questions.length;
+
+  document.getElementById('q-counter').textContent = `Question ${quiz.index + 1} of ${total}`;
+  document.getElementById('q-progress').style.width = `${(quiz.index / total) * 100}%`;
+
+  const diffEl = document.getElementById('q-difficulty');
+  diffEl.textContent = q.diff.charAt(0).toUpperCase() + q.diff.slice(1);
+  diffEl.className = `q-difficulty ${q.diff}`;
+
+  document.getElementById('q-text').textContent = q.q;
+
+  const grid = document.getElementById('options-grid');
+  grid.innerHTML = '';
+  const letters = ['A','B','C','D'];
+  q.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="opt-letter">${letters[i]}</span>${opt}`;
+    btn.onclick = () => selectAnswer(i);
+    grid.appendChild(btn);
+  });
+
+  document.getElementById('feedback-bar').className = 'feedback-bar';
+  document.getElementById('next-btn').style.display = 'none';
+
+  startTimer(q);
+}
+
+function startTimer(q) {
+  clearInterval(timerInterval);
+  timeLeft = 15;
+  const arc = document.getElementById('timer-arc');
+  const circ = 144.5;
+  arc.style.strokeDashoffset = 0;
+  arc.style.stroke = 'var(--accent)';
+
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById('timer-val').textContent = timeLeft;
+    arc.style.strokeDashoffset = circ * (1 - timeLeft / 15);
+    if (timeLeft <= 5) arc.style.stroke = 'var(--red)';
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      timeoutAnswer();
+    }
+  }, 1000);
+}
+
+function timeoutAnswer() {
+  const q = quiz.questions[quiz.index];
+  const btns = document.querySelectorAll('.option-btn');
+  btns.forEach((b, i) => {
+    b.disabled = true;
+    if (i === q.ans) b.classList.add('correct');
+  });
+  state.streak = 0;
+  updateHUD();
+  showFeedback(false, 0, 0);
+  document.getElementById('next-btn').style.display = 'block';
+  toast('⏰', "Time's up!");
+}
+
+function selectAnswer(idx) {
+  clearInterval(timerInterval);
+  const q = quiz.questions[quiz.index];
+  const btns = document.querySelectorAll('.option-btn');
+  btns.forEach(b => b.disabled = true);
+
+  const isCorrect = idx === q.ans;
+  btns[idx].classList.add(isCorrect ? 'correct' : 'wrong');
+  if (!isCorrect) btns[q.ans].classList.add('correct');
+
+  let xpGain = 0, coinGain = 0;
+  if (isCorrect) {
+    quiz.correct++;
+    state.totalCorrect++;
+    state.streak++;
+    if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+    const bonus = state.streak >= 3 ? Math.floor(q.xp * 0.5) : 0;
+    xpGain = q.xp + bonus + Math.max(0, timeLeft * 2);
+    coinGain = q.diff === 'hard' ? 5 : q.diff === 'medium' ? 3 : 1;
+    if (state.streak >= 3) coinGain += 2;
+    quiz.xpEarned += xpGain;
+    quiz.coinsEarned += coinGain;
+    state.coins += coinGain;
+    gainXP(xpGain);
+    if (state.streak >= 3) toast('🔥', `${state.streak}x Streak Bonus! +${Math.floor(q.xp*0.5)} XP`);
+  } else {
+    state.streak = 0;
+    updateHUD();
+    checkBadges();
+  }
+
+  showFeedback(isCorrect, xpGain, coinGain);
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function showFeedback(correct, xp, coins) {
+  const bar = document.getElementById('feedback-bar');
+  if (correct) {
+    bar.className = 'feedback-bar correct-fb show';
+    document.getElementById('feedback-icon').textContent = '✓';
+    document.getElementById('feedback-text').textContent = 'Correct! Well done.';
+    document.getElementById('xp-gained').textContent = `+${xp} XP  +${coins}🪙`;
+  } else {
+    bar.className = 'feedback-bar wrong-fb show';
+    document.getElementById('feedback-icon').textContent = '✗';
+    document.getElementById('feedback-text').textContent = 'Not quite. Keep going!';
+    document.getElementById('xp-gained').textContent = '0 XP';
+  }
+}
+
+function nextQuestion() {
+  quiz.index++;
+  if (quiz.index >= quiz.questions.length) {
+    showResults();
+  } else {
+    loadQuestion();
+  }
+}
+
+function showResults() {
+  state.lastPerfect = quiz.correct === quiz.questions.length;
+  checkBadges();
+
+  const pct = quiz.correct / quiz.questions.length;
+  const emoji = pct === 1 ? '🏆' : pct >= .7 ? '🎉' : pct >= .4 ? '👍' : '💪';
+  const title = pct === 1 ? 'Perfect Score!' : pct >= .7 ? 'Great Job!' : pct >= .4 ? 'Not Bad!' : 'Keep Practicing!';
+
+  document.getElementById('results-emoji').textContent = emoji;
+  document.getElementById('results-title').textContent = title;
+  document.getElementById('results-sub').textContent = `You got ${quiz.correct} out of ${quiz.questions.length} correct`;
+  document.getElementById('r-score').textContent = `${quiz.correct}/${quiz.questions.length}`;
+  document.getElementById('r-xp').textContent = `+${quiz.xpEarned}`;
+  document.getElementById('r-coins').textContent = `+${quiz.coinsEarned}`;
+
+  renderLeaderboard();
+  showScreen('screen-results');
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+spawnParticles();
+updateHUD();
+renderBadges();
+renderLeaderboard();
+</script>
+</body>
+</html>
